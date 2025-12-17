@@ -6,42 +6,58 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
-const mongoURI = "mongodb+srv://joaopaulozorio_db_user:5XBzTcqSHzuKf4UB@sistem-de-senhas.qxvgymx.mongodb.net/Test?retryWrites=true&w=majority&appName=sistem-de-senhas"
+const mongoURI = "SUA_URL_DO_MONGODB_AQUI" // Mantenha a sua URL original
 
 mongoose.connect(mongoURI)
-  .then(() => console.log("Conectado ao MongoDB com sucesso!"))
-  .catch(err => console.error("Erro ao conectar ao MongoDB:", err))
+  .then(() => console.log("Conectado ao MongoDB!"))
 
+// NOVO ESQUEMA: Agora salva HWID e Data de Expiração
 const SenhaSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true },
-  usada: { type: Boolean, default: false }
+  usada: { type: Boolean, default: false },
+  hwid: { type: String, default: null },
+  expiraEm: { type: Date, default: null }
 }, { collection: 'senhas' })
 
 const Senha = mongoose.model("Senha", SenhaSchema)
 
 app.post("/validar", async (req, res) => {
-  const { senha } = req.body
+  const { senha, hwid } = req.body // Recebe a senha e o HWID do PC
+  
   try {
     const senhaEncontrada = await Senha.findOne({ codigo: senha.trim() })
     
     if (!senhaEncontrada) {
-        return res.json({ ok: false, msg: "Senha inválida" })
+        return res.json({ ok: false, msg: "KEY INVÁLIDA" })
     }
 
-    // CORREÇÃO AQUI: Enviando explicitamente o campo 'usada' para o Script
-    if (senhaEncontrada.usada) {
-        return res.json({ ok: false, usada: true, msg: "Senha já utilizada" })
+    const agora = new Date()
+
+    // CENÁRIO 1: PRIMEIRO USO (Vincular HWID e 24h)
+    if (!senhaEncontrada.usada) {
+        senhaEncontrada.usada = true
+        senhaEncontrada.hwid = hwid
+        senhaEncontrada.expiraEm = new Date(agora.getTime() + 24 * 60 * 60 * 1000) // +24 horas
+        await senhaEncontrada.save()
+        return res.json({ ok: true, msg: "ACESSO LIBERADO (PRIMEIRO USO)" })
     }
 
-    // Marca como usada e libera
-    senhaEncontrada.usada = true
-    await senhaEncontrada.save()
-    res.json({ ok: true, msg: "Acesso liberado" })
-    
+    // CENÁRIO 2: JÁ FOI USADA - Verificar se é o mesmo PC (HWID)
+    if (senhaEncontrada.hwid !== hwid) {
+        return res.json({ ok: false, msg: "KEY VINCULADA A OUTRO PC!" })
+    }
+
+    // CENÁRIO 3: MESMO PC - Verificar se o tempo de 24h acabou
+    if (agora > senhaEncontrada.expiraEm) {
+        return res.json({ ok: false, msg: "KEY EXPIRADA (24H PASSARAM)" })
+    }
+
+    // TUDO OK: Mesmo PC e ainda está no prazo de 24h
+    return res.json({ ok: true, msg: "BEM-VINDO DE VOLTA!" })
+
   } catch (erro) {
-    res.json({ ok: false, msg: "Erro no servidor" })
+    res.status(500).json({ ok: false, msg: "ERRO NO SERVIDOR" })
   }
 })
 
-const PORT = process.env.PORT || 10000
-app.listen(PORT, () => console.log("Servidor na porta " + PORT))
+app.listen(process.env.PORT || 3000, () => console.log("Servidor Online!"))
