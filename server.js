@@ -1,42 +1,51 @@
 const express = require("express")
-const fs = require("fs")
+const mongoose = require("mongoose")
+const cors = require("cors")
 const app = express()
 
 app.use(express.json())
+app.use(cors())
 
-// Lista de senhas ativas (agora em memória, não em arquivo)
-// Quando o servidor inicia, todas as senhas estão como 'false' (não usadas).
-const senhasAtivas = {
-  "ABC123": false,
-  "TESTE456": false,
-  "SENHA789": false
-}
+// URL CORRIGIDA: sistem-de-senhas (sem o 'a' de sistema, como pediste)
+const mongoURI = "mongodb+srv://joaopaulozorio_db_user:5XBzTcqSHzuKf4UB@sistem-de-senhas.qxvgymx.mongodb.net/Test?retryWrites=true&w=majority&appName=sistem-de-senhas"
 
+mongoose.connect(mongoURI)
+  .then(() => console.log("Conectado ao MongoDB (Cluster: sistem-de-senhas) com sucesso!"))
+  .catch(err => console.error("Erro ao conectar ao MongoDB:", err))
 
-// rota para validar senha
-app.post("/validar", (req, res) => {
+const SenhaSchema = new mongoose.Schema({
+  codigo: { type: String, required: true, unique: true },
+  usada: { type: Boolean, default: false }
+}, { collection: 'senhas' })
+
+const Senha = mongoose.model("Senha", SenhaSchema)
+
+app.post("/validar", async (req, res) => {
   const { senha } = req.body
+  if (!senha) return res.json({ ok: false, msg: "Senha vazia" })
 
-  // 1. Verifica se a senha existe na lista
-  if (!(senha in senhasAtivas)) {
-    return res.json({ ok: false, msg: "Senha inválida" })
+  try {
+    const senhaEncontrada = await Senha.findOne({ codigo: senha.trim() })
+
+    if (!senhaEncontrada) {
+      return res.json({ ok: false, msg: "Senha inválida" })
+    }
+
+    if (senhaEncontrada.usada) {
+      return res.json({ ok: false, msg: "Senha já utilizada" })
+    }
+
+    senhaEncontrada.usada = true
+    await senhaEncontrada.save()
+
+    res.json({ ok: true, msg: "Acesso liberado" })
+  } catch (erro) {
+    console.error("Erro interno:", erro)
+    res.json({ ok: false, msg: "Erro no servidor" })
   }
-
-  // 2. Verifica se a senha já foi usada (marcada como true)
-  if (senhasAtivas[senha] === true) {
-    return res.json({ ok: false, msg: "Senha já utilizada" })
-  }
-
-  // 3. Marca a senha como usada (dentro da memória)
-  senhasAtivas[senha] = true
-
-  // 4. Envia a resposta de sucesso
-  res.json({ ok: true, msg: "Acesso liberado" })
 })
 
-
 const PORT = process.env.PORT || 3000
-
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta " + PORT)
 })
