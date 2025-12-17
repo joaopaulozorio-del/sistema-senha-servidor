@@ -23,12 +23,21 @@ app.post("/validar", async (req, res) => {
   const { senha } = req.body
   try {
     const senhaEncontrada = await Senha.findOne({ codigo: senha.trim() })
-    if (!senhaEncontrada) return res.json({ ok: false, msg: "Senha inválida" })
-    if (senhaEncontrada.usada) return res.json({ ok: false, msg: "Senha já utilizada" })
+    
+    if (!senhaEncontrada) {
+        return res.json({ ok: false, msg: "Senha inválida" })
+    }
 
+    // CORREÇÃO AQUI: Enviando explicitamente o campo 'usada' para o Script
+    if (senhaEncontrada.usada) {
+        return res.json({ ok: false, usada: true, msg: "Senha já utilizada" })
+    }
+
+    // Marca como usada e libera
     senhaEncontrada.usada = true
     await senhaEncontrada.save()
     res.json({ ok: true, msg: "Acesso liberado" })
+    
   } catch (erro) {
     res.json({ ok: false, msg: "Erro no servidor" })
   }
