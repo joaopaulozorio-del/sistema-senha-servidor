@@ -39,7 +39,7 @@ app.post("/validar", async (req, res) => {
         senhaEncontrada.hwid = hwid
         senhaEncontrada.expiraEm = new Date(agora.getTime() + 24 * 60 * 60 * 1000) // +24 horas
         await senhaEncontrada.save()
-        return res.json({ ok: true, msg: "ACESSO LIBERADO" })
+        return res.json({ ok: true, msg: "ACESSO LIBERADO (PRIMEIRO USO)" })
     }
 
     // CENÁRIO 2: JÁ FOI USADA - Verificar se é o mesmo PC (HWID)
@@ -49,7 +49,7 @@ app.post("/validar", async (req, res) => {
 
     // CENÁRIO 3: MESMO PC - Verificar se o tempo de 24h acabou
     if (agora > senhaEncontrada.expiraEm) {
-        return res.json({ ok: false, msg: "KEY EXPIRADA" })
+        return res.json({ ok: false, msg: "KEY EXPIRADA (24H PASSARAM)" })
     }
 
     // TUDO OK: Mesmo PC e ainda está no prazo de 24h
