@@ -6,10 +6,12 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
-const mongoURI = "SUA_URL_DO_MONGODB_AQUI" // Mantenha a sua URL original
+// SEU LINK DO MONGODB (Recuperado do seu backup)
+const mongoURI = "mongodb+srv://joaopaulozorio_db_user:5XBzTcqSHzuKf4UB@sistem-de-senhas.qxvgymx.mongodb.net/Test?retryWrites=true&w=majority&appName=sistem-de-senhas"
 
 mongoose.connect(mongoURI)
-  .then(() => console.log("Conectado ao MongoDB!"))
+  .then(() => console.log("Conectado ao MongoDB com sucesso!"))
+  .catch(err => console.error("Erro ao conectar:", err))
 
 // NOVO ESQUEMA: Agora salva HWID e Data de Expiração
 const SenhaSchema = new mongoose.Schema({
@@ -22,7 +24,7 @@ const SenhaSchema = new mongoose.Schema({
 const Senha = mongoose.model("Senha", SenhaSchema)
 
 app.post("/validar", async (req, res) => {
-  const { senha, hwid } = req.body // Recebe a senha e o HWID do PC
+  const { senha, hwid } = req.body 
   
   try {
     const senhaEncontrada = await Senha.findOne({ codigo: senha.trim() })
@@ -33,26 +35,26 @@ app.post("/validar", async (req, res) => {
 
     const agora = new Date()
 
-    // CENÁRIO 1: PRIMEIRO USO (Vincular HWID e 24h)
+    // 1. PRIMEIRO USO (Vincular HWID e 24h)
     if (!senhaEncontrada.usada) {
         senhaEncontrada.usada = true
         senhaEncontrada.hwid = hwid
-        senhaEncontrada.expiraEm = new Date(agora.getTime() + 24 * 60 * 60 * 1000) // +24 horas
+        senhaEncontrada.expiraEm = new Date(agora.getTime() + 24 * 60 * 60 * 1000) 
         await senhaEncontrada.save()
         return res.json({ ok: true, msg: "ACESSO LIBERADO (PRIMEIRO USO)" })
     }
 
-    // CENÁRIO 2: JÁ FOI USADA - Verificar se é o mesmo PC (HWID)
+    // 2. JÁ USADA - Verificar se é o mesmo PC (HWID)
     if (senhaEncontrada.hwid !== hwid) {
         return res.json({ ok: false, msg: "KEY VINCULADA A OUTRO PC!" })
     }
 
-    // CENÁRIO 3: MESMO PC - Verificar se o tempo de 24h acabou
+    // 3. MESMO PC - Verificar se o tempo de 24h acabou
     if (agora > senhaEncontrada.expiraEm) {
         return res.json({ ok: false, msg: "KEY EXPIRADA (24H PASSARAM)" })
     }
 
-    // TUDO OK: Mesmo PC e ainda está no prazo de 24h
+    // TUDO OK
     return res.json({ ok: true, msg: "BEM-VINDO DE VOLTA!" })
 
   } catch (erro) {
@@ -60,4 +62,6 @@ app.post("/validar", async (req, res) => {
   }
 })
 
-app.listen(process.env.PORT || 3000, () => console.log("Servidor Online!"))
+// O Render usa a porta da variável de ambiente PORT
+const PORT = process.env.PORT || 10000
+app.listen(PORT, () => console.log(`Servidor Online na porta ${PORT}`))
