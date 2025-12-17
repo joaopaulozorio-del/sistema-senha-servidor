@@ -8,8 +8,12 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "electron": "^39.2.7",
     "express": "^4.18.2",
-    "mongoose": "^7.0.0",
-    "electron": "^39.2.7"
+    "mongoose": "^7.0.0"
+  },
+  "devDependencies": {
+    "electron-packager": "^17.1.2"
   }
 }
+
