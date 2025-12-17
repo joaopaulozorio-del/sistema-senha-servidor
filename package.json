@@ -1,14 +1,15 @@
 {
-  "name": "sistema-senha-servidor",
+  "name": "sistema-senha",
   "version": "1.0.0",
-  "description": "Servidor para validação de senhas",
-  "main": "server.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "electron": "electron ."
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.18.2",
     "mongoose": "^7.0.0",
-    "cors": "^2.8.5"
+    "electron": "^39.2.7"
   }
 }
