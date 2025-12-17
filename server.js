@@ -4,36 +4,36 @@ const app = express()
 
 app.use(express.json())
 
-// Arquivo onde ficam as senhas no servidor
-const arquivo = "senhas-server.json"
-
-// cria o arquivo se não existir
-if (!fs.existsSync(arquivo)) {
-  fs.writeFileSync(arquivo, JSON.stringify({
-    "ABC123": false,
-    "TESTE456": false,
-    "SENHA789": false
-  }, null, 2))
+// Lista de senhas ativas (agora em memória, não em arquivo)
+// Quando o servidor inicia, todas as senhas estão como 'false' (não usadas).
+const senhasAtivas = {
+  "ABC123": false,
+  "TESTE456": false,
+  "SENHA789": false
 }
+
 
 // rota para validar senha
 app.post("/validar", (req, res) => {
   const { senha } = req.body
-  const dados = JSON.parse(fs.readFileSync(arquivo))
 
-  if (!(senha in dados)) {
+  // 1. Verifica se a senha existe na lista
+  if (!(senha in senhasAtivas)) {
     return res.json({ ok: false, msg: "Senha inválida" })
   }
 
-  if (dados[senha] === true) {
+  // 2. Verifica se a senha já foi usada (marcada como true)
+  if (senhasAtivas[senha] === true) {
     return res.json({ ok: false, msg: "Senha já utilizada" })
   }
 
-  dados[senha] = true
-  fs.writeFileSync(arquivo, JSON.stringify(dados, null, 2))
+  // 3. Marca a senha como usada (dentro da memória)
+  senhasAtivas[senha] = true
 
+  // 4. Envia a resposta de sucesso
   res.json({ ok: true, msg: "Acesso liberado" })
 })
+
 
 const PORT = process.env.PORT || 3000
 
