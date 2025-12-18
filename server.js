@@ -2,71 +2,62 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
-
 app.use(express.json());
 app.use(cors());
 
-// Sua conexão com o MongoDB
 const mongoURI = "mongodb+srv://joaopaulozorio_db_user:5XBzTcqSHzuKf4UB@sistem-de-senhas.qxvgymx.mongodb.net/Test?retryWrites=true&w=majority&appName=sistem-de-senhas";
 
-mongoose.connect(mongoURI)
-  .then(() => console.log("Conectado ao MongoDB!"))
-  .catch(err => console.error("Erro MongoDB:", err));
+mongoose.connect(mongoURI).then(() => console.log("MongoDB Online!"));
 
-// Schema atualizado com HWID e Data de Expiração
-const SenhaSchema = new mongoose.Schema({
-  codigo: { type: String, required: true, unique: true },
+// Modelo com 'tipo' para definir a duração
+const Senha = mongoose.model("Senha", new mongoose.Schema({
+  codigo: String,
   usada: { type: Boolean, default: false },
-  hwid: { type: String, default: null },         // Salva o ID do PC
-  expiraEm: { type: Date, default: null }        // Salva quando a key vence
-}, { collection: 'senhas' });
-
-const Senha = mongoose.model("Senha", SenhaSchema);
+  hwid: String,
+  expiraEm: Date,
+  tipo: { type: String, enum: ['7dias', '30dias', 'vitalicio'], default: '30dias' } 
+}, { collection: 'senhas' }));
 
 app.post("/validar", async (req, res) => {
   const { senha, hwid } = req.body;
-
   try {
-    const senhaDoc = await Senha.findOne({ codigo: senha.trim() });
-
-    if (!senhaDoc) {
-      return res.json({ ok: false, msg: "KEY INVÁLIDA!" });
-    }
+    const doc = await Senha.findOne({ codigo: senha.trim() });
+    if (!doc) return res.json({ ok: false, msg: "KEY INVÁLIDA!" });
 
     const agora = new Date();
 
-    // 1. VERIFICAÇÃO DE EXPIRAÇÃO
-    if (senhaDoc.expiraEm && agora > senhaDoc.expiraEm) {
-      return res.json({ ok: false, msg: "KEY EXPIRADA (24H VENCIDAS)!" });
+    // 1. Verifica se já expirou (vitalício pula essa parte)
+    if (doc.tipo !== 'vitalicio' && doc.expiraEm && agora > doc.expiraEm) {
+      return res.json({ ok: false, msg: "SUA KEY EXPIROU!" });
     }
 
-    // 2. PRIMEIRO USO (Vincular HWID e definir 24 horas)
-    if (!senhaDoc.usada) {
-      senhaDoc.usada = true;
-      senhaDoc.hwid = hwid;
-      // Define expiração para 24 horas a partir de agora
-      senhaDoc.expiraEm = new Date(agora.getTime() + 24 * 60 * 60 * 1000); 
-      await senhaDoc.save();
+    // 2. Primeiro uso: Define o tempo baseado no tipo
+    if (!doc.usada) {
+      doc.usada = true;
+      doc.hwid = hwid;
 
-      return res.json({ 
-        ok: true, 
-        msg: `ACESSO LIBERADO! VÁLIDO ATÉ: ${senhaDoc.expiraEm.toLocaleTimeString()}` 
-      });
+      if (doc.tipo === '7dias') {
+        doc.expiraEm = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
+      } else if (doc.tipo === '30dias') {
+        doc.expiraEm = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000);
+      } else if (doc.tipo === 'vitalicio') {
+        doc.expiraEm = null; // Sem expiração
+      }
+
+      await doc.save();
+      const validadeMsg = doc.tipo === 'vitalicio' ? "VITALÍCIO" : doc.expiraEm.toLocaleDateString();
+      return res.json({ ok: true, msg: `ATIVADO! VALIDADE: ${validadeMsg}` });
     }
 
-    // 3. VERIFICAÇÃO DE HWID (Se já foi usada, o PC tem que ser o mesmo)
-    if (senhaDoc.hwid !== hwid) {
-      return res.json({ ok: false, msg: "ESTA KEY PERTENCE A OUTRO PC!" });
+    // 3. Verifica HWID (Bloqueia se tentar usar em outro PC)
+    if (doc.hwid !== hwid) {
+      return res.json({ ok: false, msg: "ESTA KEY JÁ ESTÁ EM USO EM OUTRO PC!" });
     }
 
-    // Se chegou aqui, a key é válida, o PC é o mesmo e está no prazo
-    res.json({ ok: true, msg: "BEM-VINDO DE VOLTA!" });
-
-  } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ ok: false, msg: "ERRO NO SERVIDOR" });
+    return res.json({ ok: true, msg: "ACESSO LIBERADO!" });
+  } catch (err) {
+    res.json({ ok: false, msg: "ERRO NO SERVIDOR" });
   }
 });
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(process.env.PORT || 3000);
